@@ -13,9 +13,11 @@ This project presents a content-based recommendation engine that suggests movies
 - **Efficient Pipeline**: A two-stage pipeline separates heavy-duty model computation from the lightweight live application, ensuring a fast and responsive user experience.
 
 ## 🛠️ Technology Stack
-- Backend: PythonData Manipulation: Pandas, NumPy
-- Machine Learning: Scikit-learnWeb 
-- Framework: StreamlitAPI: TMDb REST API
+- Backend: Python
+- Data Manipulation: Pandas, NumPy
+- Machine Learning: Scikit-learn
+- Web Framework: Streamlit
+- API: TMDb REST API
 - Serialization: Pickle
 
 ## 🔮 Future Enhancements

@@ -7,10 +7,10 @@ The app recommends movies based on their plot similarity and fetches live data f
 This project presents a content-based recommendation engine that suggests movies to users based on their similarity to a movie they like. The core of the system is built on Natural Language Processing (NLP) techniques to analyze and compare movie plots. The entire pipeline, from data processing to a user-facing web app, is designed to be efficient and scalable.
 
 ## ✨ Features
-- Content-Based Recommendations: Suggests movies based on plot summary similarity using TF-IDF and Cosine Similarity.
-- Interactive UI: A user-friendly web interface built with Streamlit allows users to easily select a movie and get recommendations.
-- Dynamic Data Fetching: Integrates with The Movie Database (TMDb) API to fetch real-time movie details, including posters and overviews.
-- Efficient Pipeline: A two-stage pipeline separates heavy-duty model computation from the lightweight live application, ensuring a fast and responsive user experience.
+- **Content-Based Recommendations**: Suggests movies based on plot summary similarity using TF-IDF and Cosine Similarity.
+- **Interactive UI**: A user-friendly web interface built with Streamlit allows users to easily select a movie and get recommendations.
+- **Dynamic Data Fetching**: Integrates with The Movie Database (TMDb) API to fetch real-time movie details, including posters and overviews.
+- **Efficient Pipeline**: A two-stage pipeline separates heavy-duty model computation from the lightweight live application, ensuring a fast and responsive user experience.
 
 ## 🛠️ Technology Stack
 - Backend: PythonData Manipulation: Pandas, NumPy

@@ -2,84 +2,97 @@ import streamlit as st
 import pickle
 import requests
 import pandas as pd
+import time
+import random
 
-# --- Helper Functions ---
+movies = pickle.load(open('movies.pkl', 'rb'))
+similarity = pickle.load(open('similarity.pkl', 'rb'))
 
-def fetch_poster(movie_id):
-    """Fetches a movie poster from the TMDb API."""
-    # IMPORTANT: Replace YOUR_API_KEY with the key you got from TMDb
-    api_key = "f156e67c15869dcf0adaed1a88b3a56c" # Use your actual key here
-    url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key={api_key}&language=en-US"
-    
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-        poster_path = data.get('poster_path')
-        if poster_path:
-            full_path = "https://image.tmdb.org/t/p/w500/" + poster_path
-            return full_path
-        else:
-            # Return a placeholder if no poster is found
-            return "https://via.placeholder.com/500x750.png?text=No+Poster"
-    except requests.exceptions.RequestException as e:
-        st.error(f"API request failed: {e}")
-        return "https://via.placeholder.com/500x750.png?text=API+Error"
+st.set_page_config(page_title="🎬 Movie Recommender", layout="wide")
 
-def recommend(movie_title):
-    """Recommends movies based on the selected movie."""
-    try:
-        # Find the index of the movie
-        movie_index = movies_df[movies_df['title'] == movie_title].index[0]
-    except IndexError:
-        st.error("Movie not found in the dataset.")
-        return [], []
-        
-    # Get similarity scores and sort them
-    distances = similarity[movie_index]
-    movies_list = sorted(list(enumerate(distances)), reverse=True, key=lambda x: x[1])[1:6] # Top 5
-    
-    recommended_movies_names = []
-    recommended_movies_posters = []
-    
-    for i in movies_list:
-        movie_id = movies_df.iloc[i[0]].id
-        recommended_movies_posters.append(fetch_poster(movie_id))
-        recommended_movies_names.append(movies_df.iloc[i[0]].title)
-        
-    return recommended_movies_names, recommended_movies_posters
+API_KEY = "f156e67c15869dcf0adaed1a88b3a56c"
 
+def get_movie_info(movie_id):
+    """Fetch and cache all movie info: details + cast + poster"""
+    base_url = "https://api.themoviedb.org/3/movie"
+    urls = {
+        "details": f"{base_url}/{movie_id}?api_key={API_KEY}&language=en-US",
+        "credits": f"{base_url}/{movie_id}/credits?api_key={API_KEY}&language=en-US"
+    }
 
-# --- Load Pre-computed Data ---
-# Load the movie list and similarity matrix we saved in Stage 1
-try:
-    movies_df = pd.DataFrame(pickle.load(open('movies_list.pkl', 'rb')))
-    similarity = pickle.load(open('similarity.pkl', 'rb'))
-except FileNotFoundError:
-    st.error("Model files not found. Please run the model_builder.py script first.")
-    st.stop()
+    def safe_request(url):
+        for attempt in range(3):  # up to 3 retries
+            try:
+                res = requests.get(url, timeout=10)
+                res.raise_for_status()
+                return res.json()
+            except Exception as e:
+                print(f"Retry {attempt+1} failed for {url}: {e}")
+                time.sleep(random.uniform(0.5, 1.5))
+        return {}
 
+    details = safe_request(urls["details"])
+    credits = safe_request(urls["credits"])
 
-# --- Streamlit User Interface ---
+    poster = (
+        "https://image.tmdb.org/t/p/w500" + details.get("poster_path", "")
+        if details.get("poster_path")
+        else "https://via.placeholder.com/500x750?text=No+Image"
+    )
+    cast = ", ".join([c["name"] for c in credits.get("cast", [])[:5]]) or "Cast info unavailable"
 
-st.set_page_config(layout="wide")
-st.title('🎬 Movie Recommendation System')
-st.markdown("Select a movie you like, and we'll suggest 5 similar ones!")
+    return {
+        "title": details.get("title", "N/A"),
+        "overview": details.get("overview", "No overview available."),
+        "release_date": details.get("release_date", "N/A"),
+        "rating": details.get("vote_average", "N/A"),
+        "poster": poster,
+        "cast": cast,
+        "id": movie_id
+    }
 
-selected_movie_name = st.selectbox(
-    'Choose a movie from the dropdown:',
-    movies_df['title'].values
+def recommend(movie):
+    index = movies[movies['title'] == movie].index[0]
+    distances = sorted(
+        list(enumerate(similarity[index])),
+        reverse=True,
+        key=lambda x: x[1]
+    )
+
+    recommended_movies = []
+    for i in distances[1:6]:
+        movie_id = movies.iloc[i[0]].id
+        info = get_movie_info(movie_id)
+        recommended_movies.append(info)
+    return recommended_movies
+
+st.title("🎬 Movie Recommendation System")
+st.markdown("##### Find movies similar to your favorite ones, with live TMDb data!")
+
+# Autocomplete Search Bar
+movie_list = movies['title'].values
+selected_movie = st.selectbox(
+    "🔍 Type or select a movie:",
+    movie_list,
+    index=None,
+    placeholder="Search for a movie..."
 )
 
-if st.button('Recommend'):
-    with st.spinner('Finding recommendations...'):
-        names, posters = recommend(selected_movie_name)
-    
-    if names:
-        st.subheader("Here are your recommendations:")
-        # Create 5 columns to display the movies
+if selected_movie:
+    if st.button("Recommend 🎥"):
+        with st.spinner("Fetching recommendations..."):
+            recommendations = recommend(selected_movie)
+
+        st.subheader(f"Because you liked **{selected_movie}**, you might enjoy:")
         cols = st.columns(5)
-        for i in range(5):
+
+        for i, rec in enumerate(recommendations):
             with cols[i]:
-                st.text(names[i])
-                st.image(posters[i])
+                st.image(rec['poster'], use_container_width=True)
+                st.markdown(f"**{rec['title']}**")
+                with st.expander("ℹ️ More info"):
+                    st.markdown(f"**Release Date:** {rec['release_date']}")
+                    st.markdown(f"**Rating:** ⭐ {rec['rating']}")
+                    st.markdown(f"**Cast:** {rec['cast']}")
+                    st.markdown(f"**Overview:** {rec['overview']}")
+    

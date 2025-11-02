@@ -1,24 +1,51 @@
 import pandas as pd
+import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import pickle
 
-# 1. Load your dataset (e.g., the one from Kaggle's TMDB 5000 movies)
-df = pd.read_csv('tmdb_5000_movies.csv')
-# For simplicity, let's just use the overview for recommendations
-df = df[['id', 'title', 'overview']]
-df.dropna(inplace=True)
+df = pd.read_csv('cleaned_movies_metadata.csv')
+print("Data loaded:", df.shape)
+print(df.head(3))
 
-# 2. Vectorize the 'overview' text data
-tfidf = TfidfVectorizer(stop_words='english')
-tfidf_matrix = tfidf.fit_transform(df['overview'])
+tfidf = TfidfVectorizer(
+    stop_words='english',
+    max_features=5000
+)
 
-# 3. Compute the Cosine Similarity Matrix
-similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
+tfidf_matrix = tfidf.fit_transform(df['metadata'])
+print("TF-IDF matrix shape:", tfidf_matrix.shape)
 
-# 4. Save the processed dataframe and the similarity matrix to disk
-# This is the crucial step for your web app
-pickle.dump(df.to_dict(orient='records'), open('movies_list.pkl', 'wb'))
-pickle.dump(similarity_matrix, open('similarity.pkl', 'wb'))
+similarity = cosine_similarity(tfidf_matrix)
+print("Cosine similarity matrix computed:", similarity.shape)
 
-print("Model and data saved successfully!")
+def recommend(movie_title, df=df, similarity=similarity):
+    """
+    Given a movie title, recommend top 5 similar movies.
+    """
+    if movie_title not in df['title'].values:
+        print(f"'{movie_title}' not found in database.")
+        return []
+
+    # Get index of the movie
+    idx = df[df['title'] == movie_title].index[0]
+
+    # Retrieve pairwise similarity scores
+    distances = list(enumerate(similarity[idx]))
+
+    # Sort by similarity (descending) and take top 5 (excluding itself)
+    top_matches = sorted(distances, key=lambda x: x[1], reverse=True)[1:6]
+
+    recommended_movies = [df.iloc[i[0]].title for i in top_matches]
+    print(f"\n Because you liked '{movie_title}', you may also like:")
+    for m in recommended_movies:
+        print("   →", m)
+    return recommended_movies
+
+# Quick test
+recommend('Avatar')
+
+# Save model artifacts for app deployment
+pickle.dump(df, open('movies.pkl', 'wb'))
+pickle.dump(similarity, open('similarity.pkl', 'wb'))
+print("\n Pickle files saved: movies.pkl and similarity.pkl")
